@@ -2,6 +2,7 @@
   "name": "hotel-management-pro",
   "version": "2.0.0",
   "description": "Professional Hotel Management System with modern UI and robust backend",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "vercel dev",
