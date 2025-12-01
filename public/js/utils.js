@@ -68,52 +68,100 @@ class ModalManager {
     }
 }
 
-// API helper with error handling
+// API helper with error handling and rate limiting
 class ApiClient {
     constructor(baseURL = '/api') {
         this.baseURL = baseURL;
+        this.requestQueue = new Map();
+        this.rateLimits = {
+            general: 30, // 30 requests per minute
+            write: 10    // 10 write operations per minute
+        };
+        this.requestCounts = {
+            general: [],
+            write: []
+        };
+    }
+    
+    // Check rate limits
+    checkRateLimit(type = 'general') {
+        const now = Date.now();
+        const oneMinuteAgo = now - 60000;
+        
+        // Clean old requests
+        this.requestCounts[type] = this.requestCounts[type].filter(time => time > oneMinuteAgo);
+        
+        // Check if limit exceeded
+        if (this.requestCounts[type].length >= this.rateLimits[type]) {
+            const oldestRequest = Math.min(...this.requestCounts[type]);
+            const waitTime = Math.ceil((oldestRequest + 60000 - now) / 1000);
+            throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds.`);
+        }
+        
+        // Add current request
+        this.requestCounts[type].push(now);
     }
     
     async request(endpoint, options = {}) {
         try {
-            const url = `${this.baseURL}${endpoint}`;
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...options.headers
-                },
-                ...options
-            };
+            // Check rate limits
+            const isWriteOperation = ['POST', 'PUT', 'DELETE'].includes(options.method || 'GET');
+            this.checkRateLimit(isWriteOperation ? 'write' : 'general');
             
-            const response = await fetch(url, config);
+            // Prevent duplicate requests
+            const requestKey = `${options.method || 'GET'}-${endpoint}-${JSON.stringify(options.body || {})}`;
             
-            if (!response.ok) {
-                let error;
-                try {
-                    error = await response.json();
-                } catch (e) {
-                    // If response is not JSON, use status text
-                    error = { error: `HTTP ${response.status}: ${response.statusText}` };
-                }
-                throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
-            }
+            // Create request promise
+            const requestPromise = this.executeRequest(endpoint, options);
             
-            // Handle success response
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return await response.json();
-            } else {
-                // If not JSON, return text or throw error
-                const text = await response.text();
-                if (text.startsWith('<')) {
-                    throw new Error('Server returned HTML instead of JSON - check API configuration');
-                }
-                return text;
-            }
+            // Store in queue and clean up after completion
+            this.requestQueue.set(requestKey, requestPromise);
+            requestPromise.finally(() => {
+                this.requestQueue.delete(requestKey);
+            });
+            
+            return requestPromise;
         } catch (error) {
             console.error('API Error:', error);
             ToastManager.show(error.message, 'error');
             throw error;
+        }
+    }
+    
+    async executeRequest(endpoint, options = {}) {
+        const url = `${this.baseURL}${endpoint}`;
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
+        };
+        
+        const response = await fetch(url, config);
+        
+        if (!response.ok) {
+            let error;
+            try {
+                error = await response.json();
+            } catch (e) {
+                // If response is not JSON, use status text
+                error = { error: `HTTP ${response.status}: ${response.statusText}` };
+            }
+            throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        // Handle success response
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return await response.json();
+        } else {
+            // If not JSON, return text or throw error
+            const text = await response.text();
+            if (text.startsWith('<')) {
+                throw new Error('Server returned HTML instead of JSON - check API configuration');
+            }
+            return text;
         }
     }
     
@@ -274,16 +322,42 @@ class LoadingManager {
     }
 }
 
-// Export utilities to global scope
+// Debounce utility for frequent operations
+class Debouncer {
+    constructor() {
+        this.timeouts = new Map();
+    }
+    
+    debounce(key, func, delay = 300) {
+        if (this.timeouts.has(key)) {
+            clearTimeout(this.timeouts.get(key));
+        }
+        
+        const timeout = setTimeout(() => {
+            func();
+            this.timeouts.delete(key);
+        }, delay);
+        
+        this.timeouts.set(key, timeout);
+    }
+    
+    cancel(key) {
+        if (this.timeouts.has(key)) {
+            clearTimeout(this.timeouts.get(key));
+            this.timeouts.delete(key);
+        }
+    }
+}
+
+// Create global instances
+const debouncer = new Debouncer();
+window.api = new ApiClient();
 window.HotelUtils = {
     ToastManager,
     ModalManager,
-    ApiClient,
-    FormValidator,
     DateUtils,
     CurrencyUtils,
-    LoadingManager
+    FormValidator,
+    LoadingManager,
+    Debouncer: debouncer
 };
-
-// Initialize API client
-window.api = new HotelUtils.ApiClient();

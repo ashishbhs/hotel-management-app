@@ -2,12 +2,35 @@ import { RateLimiterMemory } from 'rate-limiter-flexible';
 import helmet from 'helmet';
 
 // Rate limiting configuration
-const rateLimiter = new RateLimiterMemory({
-  keyGenerator: (req) => req.headers['x-forwarded-for'] || req.connection.remoteAddress,
-  points: 100, // Number of requests
-  duration: 60, // Per 60 seconds
-  blockDuration: 60, // Block for 60 seconds if limit exceeded
-});
+const rateLimitOptions = {
+  // General API limits
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+  message: {
+    error: 'Too many requests. Please try again later.',
+    retryAfter: 60
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  
+  // Skip successful requests (only count failed ones)
+  skipSuccessfulRequests: false,
+  
+  // Custom key generator for better tracking
+  keyGenerator: (req) => {
+    return req.headers['x-forwarded-for'] || 
+           req.headers['x-real-ip'] || 
+           req.connection.remoteAddress || 
+           'unknown';
+  }
+};
+
+// Stricter limits for sensitive endpoints
+const strictRateLimitOptions = {
+  ...rateLimitOptions,
+  max: 10, // 10 requests per minute for POST/PUT/DELETE
+  windowMs: 1 * 60 * 1000,
+};
 
 // Rate limiting middleware
 export const rateLimitMiddleware = async (req, res, next) => {
@@ -180,10 +203,77 @@ export const requestId = (req, res, next) => {
   next();
 };
 
-// Compression check middleware (for Vercel)
-export const compressionCheck = (req, res, next) => {
-  // Vercel handles compression automatically
-  // This middleware can be used for custom compression if needed
+// Enhanced rate limiting with different limits for different methods
+export const enhancedRateLimit = async (req, res, next) => {
+  const ip = req.headers['x-forwarded-for'] || 
+             req.headers['x-real-ip'] || 
+             req.connection.remoteAddress || 
+             'unknown';
+  
+  // Stricter limits for write operations
+  const isWriteOperation = ['POST', 'PUT', 'DELETE'].includes(req.method);
+  const maxRequests = isWriteOperation ? 10 : 30; // 10 write ops, 30 read ops per minute
+  
+  try {
+    await rateLimiter.consume(ip, maxRequests);
+    next();
+  } catch (rejRes) {
+    const secs = Math.round(rejRes.msBeforeNext / 1000) || 1;
+    res.set('Retry-After', String(secs));
+    res.status(429).json({
+      error: 'Too many requests',
+      message: `Rate limit exceeded. Please try again in ${secs} seconds.`,
+      retryAfter: secs
+    });
+  }
+};
+
+// Request size limiting to prevent large payloads
+export const requestSizeLimit = (req, res, next) => {
+  const contentLength = parseInt(req.headers['content-length'] || '0');
+  const maxSize = 1024 * 1024; // 1MB limit
+  
+  if (contentLength > maxSize) {
+    return res.status(413).json({
+      error: 'Request too large',
+      message: 'Maximum request size is 1MB'
+    });
+  }
+  
+  next();
+};
+
+// Simple in-memory cache for GET requests
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+export const cacheMiddleware = (req, res, next) => {
+  // Only cache GET requests
+  if (req.method !== 'GET') {
+    return next();
+  }
+  
+  const key = `${req.url}-${JSON.stringify(req.query)}`;
+  const cached = cache.get(key);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return res.status(200).json(cached.data);
+  }
+  
+  // Override res.json to cache the response
+  const originalJson = res.json;
+  res.json = function(data) {
+    cache.set(key, { data, timestamp: Date.now() });
+    
+    // Clean up old cache entries
+    if (cache.size > 100) {
+      const oldestKey = cache.keys().next().value;
+      cache.delete(oldestKey);
+    }
+    
+    return originalJson.call(this, data);
+  };
+  
   next();
 };
 

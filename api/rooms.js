@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
 import Joi from 'joi';
-import helmet from 'helmet';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -34,9 +33,6 @@ const updateRoomSchema = Joi.object({
 }).min(1);
 
 export default async function handler(req, res) {
-  // Apply security headers
-  helmet()(req, res, () => {});
-  
   // Set JSON content-type
   res.setHeader('Content-Type', 'application/json');
   
