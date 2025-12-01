@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/guests.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/rooms.js", 
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/bookings.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**/*",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/guests",
+      "dest": "/api/guests.js"
+    },
+    {
+      "src": "/api/rooms", 
+      "dest": "/api/rooms.js"
+    },
+    {
+      "src": "/api/bookings",
+      "dest": "/api/bookings.js"
+    },
+    {
+      "src": "/css/(.*)",
+      "dest": "/public/css/$1"
+    },
+    {
+      "src": "/js/(.*)",
+      "dest": "/public/js/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/index.html"
+    }
+  ]
+}
