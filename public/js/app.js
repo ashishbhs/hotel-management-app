@@ -51,9 +51,15 @@ class HotelManagementApp {
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
         });
-        document.querySelector(`[href="#${page}"]`).classList.add('active');
+        const activeLink = document.querySelector(`[href="#${page}"]`);
+        if (activeLink) activeLink.classList.add('active');
         
         this.currentPage = page;
+        
+        const mainContent = document.getElementById('main-content');
+        mainContent.style.opacity = '0';
+        mainContent.style.transform = 'translateY(10px)';
+        mainContent.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
         
         // Load page content
         switch (page) {
@@ -70,6 +76,12 @@ class HotelManagementApp {
                 await this.loadBookingsPage();
                 break;
         }
+        
+        // Trigger animation
+        requestAnimationFrame(() => {
+            mainContent.style.opacity = '1';
+            mainContent.style.transform = 'translateY(0)';
+        });
     }
     
     async loadDashboard() {
