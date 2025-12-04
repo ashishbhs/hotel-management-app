@@ -10,13 +10,13 @@ class HotelManagementApp {
         };
         this.init();
     }
-    
+
     async init() {
         this.setupNavigation();
         this.setupEventListeners();
         await this.loadDashboard();
     }
-    
+
     setupNavigation() {
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
@@ -26,7 +26,7 @@ class HotelManagementApp {
             });
         });
     }
-    
+
     setupEventListeners() {
         // Close modals when clicking outside
         document.addEventListener('click', (e) => {
@@ -34,7 +34,7 @@ class HotelManagementApp {
                 HotelUtils.ModalManager.hide(e.target.id);
             }
         });
-        
+
         // Close modal with close button
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('close')) {
@@ -45,7 +45,7 @@ class HotelManagementApp {
             }
         });
     }
-    
+
     async navigateToPage(page) {
         // Update active nav
         document.querySelectorAll('.nav-link').forEach(link => {
@@ -53,14 +53,14 @@ class HotelManagementApp {
         });
         const activeLink = document.querySelector(`[href="#${page}"]`);
         if (activeLink) activeLink.classList.add('active');
-        
+
         this.currentPage = page;
-        
+
         const mainContent = document.getElementById('main-content');
         mainContent.style.opacity = '0';
         mainContent.style.transform = 'translateY(10px)';
         mainContent.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-        
+
         // Load page content
         switch (page) {
             case 'dashboard':
@@ -76,30 +76,30 @@ class HotelManagementApp {
                 await this.loadBookingsPage();
                 break;
         }
-        
+
         // Trigger animation
         requestAnimationFrame(() => {
             mainContent.style.opacity = '1';
             mainContent.style.transform = 'translateY(0)';
         });
     }
-    
+
     async loadDashboard() {
         try {
             HotelUtils.LoadingManager.show('main-content');
-            
+
             const [guests, rooms, bookings] = await Promise.all([
                 window.api.get('/guests'),
                 window.api.get('/rooms'),
                 window.api.get('/bookings')
             ]);
-            
+
             this.data.guests = guests;
             this.data.rooms = rooms;
             this.data.bookings = bookings;
-            
+
             const stats = this.calculateStats();
-            
+
             document.getElementById('main-content').innerHTML = `
                 <div class="dashboard">
                     <div class="card">
@@ -180,19 +180,19 @@ class HotelManagementApp {
                     </table>
                 </div>
             `;
-            
+
         } catch (error) {
             console.error('Error loading dashboard:', error);
         }
     }
-    
+
     async loadGuestsPage() {
         try {
             HotelUtils.LoadingManager.show('main-content');
-            
+
             const guests = await window.api.get('/guests');
             this.data.guests = guests;
-            
+
             document.getElementById('main-content').innerHTML = `
                 <div class="actions">
                     <button class="btn" onclick="app.showGuestModal()">
@@ -243,19 +243,19 @@ class HotelManagementApp {
                     </table>
                 </div>
             `;
-            
+
         } catch (error) {
             console.error('Error loading guests:', error);
         }
     }
-    
+
     async loadRoomsPage() {
         try {
             HotelUtils.LoadingManager.show('main-content');
-            
+
             const rooms = await window.api.get('/rooms');
             this.data.rooms = rooms;
-            
+
             document.getElementById('main-content').innerHTML = `
                 <div class="actions">
                     <button class="btn btn-success" onclick="app.showRoomModal()">
@@ -304,19 +304,19 @@ class HotelManagementApp {
                     </table>
                 </div>
             `;
-            
+
         } catch (error) {
             console.error('Error loading rooms:', error);
         }
     }
-    
+
     async loadBookingsPage() {
         try {
             HotelUtils.LoadingManager.show('main-content');
-            
+
             const bookings = await window.api.get('/bookings');
             this.data.bookings = bookings;
-            
+
             document.getElementById('main-content').innerHTML = `
                 <div class="actions">
                     <button class="btn btn-warning" onclick="app.showBookingModal()">
@@ -387,12 +387,12 @@ class HotelManagementApp {
                     </table>
                 </div>
             `;
-            
+
         } catch (error) {
             console.error('Error loading bookings:', error);
         }
     }
-    
+
     // Modal methods
     showGuestModal() {
         const modalHTML = `
@@ -426,12 +426,12 @@ class HotelManagementApp {
                 </form>
             </div>
         `;
-        
+
         HotelUtils.ModalManager.create('guestModal', modalHTML);
         HotelUtils.ModalManager.show('guestModal');
         this.setupGuestForm();
     }
-    
+
     showRoomModal() {
         const modalHTML = `
             <div class="modal-content">
@@ -466,19 +466,19 @@ class HotelManagementApp {
                 </form>
             </div>
         `;
-        
+
         HotelUtils.ModalManager.create('roomModal', modalHTML);
         HotelUtils.ModalManager.show('roomModal');
         this.setupRoomForm();
     }
-    
+
     async showBookingModal() {
         try {
             const [guests, rooms] = await Promise.all([
                 window.api.get('/guests'),
                 window.api.get('/rooms?available=true')
             ]);
-            
+
             const modalHTML = `
                 <div class="modal-content">
                     <div class="modal-header">
@@ -520,16 +520,16 @@ class HotelManagementApp {
                     </form>
                 </div>
             `;
-            
+
             HotelUtils.ModalManager.create('bookingModal', modalHTML);
             HotelUtils.ModalManager.show('bookingModal');
             this.setupBookingForm();
-            
+
         } catch (error) {
             console.error('Error showing booking modal:', error);
         }
     }
-    
+
     // Form setup methods
     setupGuestForm() {
         const form = document.getElementById('guestForm');
@@ -544,7 +544,7 @@ class HotelManagementApp {
                     address: formData.get('address'),
                     id_proof: formData.get('id_proof')
                 };
-                
+
                 try {
                     await window.api.post('/guests', guestData);
                     HotelUtils.ToastManager.show('Guest created successfully!', 'success');
@@ -559,7 +559,7 @@ class HotelManagementApp {
             };
         }
     }
-    
+
     setupRoomForm() {
         const form = document.getElementById('roomForm');
         if (form) {
@@ -572,7 +572,7 @@ class HotelManagementApp {
                     capacity: parseInt(formData.get('capacity')),
                     price_per_night: parseFloat(formData.get('price_per_night'))
                 };
-                
+
                 try {
                     await window.api.post('/rooms', roomData);
                     HotelUtils.ToastManager.show('Room created successfully!', 'success');
@@ -587,7 +587,7 @@ class HotelManagementApp {
             };
         }
     }
-    
+
     setupBookingForm() {
         const form = document.getElementById('bookingForm');
         if (form) {
@@ -597,7 +597,7 @@ class HotelManagementApp {
                 const checkIn = document.getElementById('check_in_date').value;
                 const checkOut = document.getElementById('check_out_date').value;
                 const totalAmountField = document.getElementById('total_amount');
-                
+
                 if (roomId && checkIn && checkOut) {
                     const room = this.data.rooms.find(r => r.id == roomId);
                     if (room) {
@@ -607,11 +607,11 @@ class HotelManagementApp {
                     }
                 }
             };
-            
+
             document.getElementById('room_id').addEventListener('change', updateTotalAmount);
             document.getElementById('check_in_date').addEventListener('change', updateTotalAmount);
             document.getElementById('check_out_date').addEventListener('change', updateTotalAmount);
-            
+
             form.onsubmit = async (e) => {
                 e.preventDefault();
                 const formData = new FormData(form);
@@ -622,7 +622,7 @@ class HotelManagementApp {
                     check_out_date: formData.get('check_out_date'),
                     total_amount: parseFloat(formData.get('total_amount'))
                 };
-                
+
                 try {
                     await window.api.post('/bookings', bookingData);
                     HotelUtils.ToastManager.show('Booking created successfully!', 'success');
@@ -637,7 +637,7 @@ class HotelManagementApp {
             };
         }
     }
-    
+
     // Action methods
     async deleteGuest(guestId) {
         if (confirm('Are you sure you want to delete this guest?')) {
@@ -650,7 +650,7 @@ class HotelManagementApp {
             }
         }
     }
-    
+
     async checkInGuest(bookingId) {
         try {
             await window.api.put(`/bookings?id=${bookingId}&action=checkin`);
@@ -660,7 +660,7 @@ class HotelManagementApp {
             // Error already handled by API client
         }
     }
-    
+
     async checkOutGuest(bookingId) {
         try {
             await window.api.put(`/bookings?id=${bookingId}&action=checkout`);
@@ -670,7 +670,7 @@ class HotelManagementApp {
             // Error already handled by API client
         }
     }
-    
+
     async cancelBooking(bookingId) {
         if (confirm('Are you sure you want to cancel this booking?')) {
             try {
@@ -682,7 +682,7 @@ class HotelManagementApp {
             }
         }
     }
-    
+
     // Utility methods
     calculateStats() {
         const totalGuests = this.data.guests.length;
@@ -691,11 +691,11 @@ class HotelManagementApp {
         const activeBookings = this.data.bookings.filter(b => ['booked', 'checked_in'].includes(b.status)).length;
         const totalRevenue = this.data.bookings.reduce((sum, b) => sum + b.total_amount, 0);
         const occupancyRate = totalRooms > 0 ? Math.round(((totalRooms - availableRooms) / totalRooms) * 100) : 0;
-        
+
         const recentBookings = this.data.bookings
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
             .slice(0, 5);
-        
+
         return {
             totalGuests,
             totalRooms,
